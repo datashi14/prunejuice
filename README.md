@@ -17,7 +17,7 @@
 
 ### 1. Download
 
-Grab the version for your OS from our [**Releases Page**](https://github.com/datashi14/prunejuice/releases/latest):
+Grab the version for your OS from our [**Releases Page**](https://github.com/datashi14/prunejuice/releases):
 
 - 🪟 **Windows**: `OpenCreativeSuite-Setup.exe`
 - 🍎 **macOS**: `OpenCreativeSuite.dmg`
@@ -92,3 +92,7 @@ We thank these teams for their contribution to open source.
 4. `cd desktop-app && npm install`
 5. Run services (see `docs/architecture.md`)
 </details>
+
+## License
+
+MIT © Open Creative Suite Team
