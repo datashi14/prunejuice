@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "Prune Juice"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "0.1.0"
 #define MyAppPublisher "Prunejuice Team"
 #define MyAppURL "https://github.com/yourusername/open-creative-suite"
 #define MyAppExeName "PruneJuice.exe"
@@ -21,7 +21,7 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={pf}\{#MyAppName}
 DisableProgramGroupPage=yes
-OutputBaseFilename=PruneJuice-Setup-v1.0.0
+OutputBaseFilename=PruneJuice-Setup-v0.1.0-Alpha
 Compression=lzma
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64

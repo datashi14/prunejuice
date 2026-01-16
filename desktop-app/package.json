@@ -1,6 +1,6 @@
 {
   "name": "prune-juice",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Prune Juice: High-performance AI Design Studio for 8GB VRAM",
   "author": "Open Creative Suite Team",
   "main": "electron/main.js",

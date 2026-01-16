@@ -1,4 +1,4 @@
-# Prune Juice
+# Prune Juice (Public Alpha)
 
 > **Your Personal AI Design Studio. Free. Private. Unlimited.**
 
