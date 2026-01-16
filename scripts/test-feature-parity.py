@@ -1,8 +1,6 @@
 import unittest
 import sys
 import os
-import time
-from unittest.mock import MagicMock, patch
 
 # Ensure paths
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,27 +48,24 @@ class TestFeatureParity(unittest.TestCase):
         We verify that our scheduler selection logic aligns with 'Speed' modes.
         """
         print("\nTesting Fooocus Speed Logic...")
-        from bridge.fooocus_connector import FooocusConnector
         
-        # We mock the pipe to check scheduler swapping logic without loading 6GB weights
-        with patch('diffusers.StableDiffusionXLPipeline') as MockPipe:
-            connector = FooocusConnector()
-            connector.pipe = MagicMock()
-            connector.pipe.scheduler.config = {}
-            
-            # Test Lightning Mode (Steps <= 8)
-            # This should trigger EulerAncestral scheduler
-            with patch('diffusers.EulerAncestralDiscreteScheduler.from_config') as MockScheduler:
-                # Mock generate call internals effectively
-                # Here we just verify the logic branch in generate would be hit
-                # Since we can't easily run generate() without real weights, we inspect the class
-                pass 
-                
-        # Static verification of the code logic via import
+        # Static verification of the code logic via source inspection
         import inspect
-        source = inspect.getsource(FooocusConnector.generate)
-        self.assertIn("EulerAncestral", source, "❌ Connector missing Lightning scheduler logic")
-        print("✅ Lightning Scheduler logic detected in Connector.")
+        try:
+            # Import in a try/catch since it requires torch dependencies
+            sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'bridge'))
+            from fooocus_connector import FooocusConnector
+            source = inspect.getsource(FooocusConnector.generate)
+            self.assertIn("EulerAncestral", source, "❌ Connector missing Lightning scheduler logic")
+            print("✅ Lightning Scheduler logic detected in Connector.")
+        except (ImportError, ModuleNotFoundError) as e:
+            print(f"⚠️  Skipping dynamic test (missing dependencies: {e})")
+            # Fallback: read file directly
+            connector_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bridge", "fooocus-connector.py")
+            with open(connector_path, 'r') as f:
+                source = f.read()
+            self.assertIn("EulerAncestral", source, "❌ Connector missing Lightning scheduler logic")
+            print("✅ Lightning Scheduler logic detected in Connector source.")
 
     def test_penpot_connectivity_logic(self):
         """
