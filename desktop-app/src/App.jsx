@@ -43,22 +43,31 @@ const StatusBadge = () => {
       }
     };
     fetchHealth();
-    const interval = setInterval(fetchHealth, 10000);
+    const interval = setInterval(fetchHealth, 5000);
     return () => clearInterval(interval);
   }, []);
 
   if (!health || health === 'offline') return null;
 
+  const engine = health.engine || {};
+  
   return (
-    <div className="flex items-center gap-4 bg-black/20 px-4 py-1.5 rounded-full border border-white/5 text-[10px] font-medium tracking-tight">
-      <div className="flex items-center gap-1.5">
-        <div className={`w-1.5 h-1.5 rounded-full ${health.status === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} />
-        <span className="text-slate-300 uppercase letter-spacing-widest">{health.hardware?.gpu || 'No GPU'}</span>
-      </div>
-      <div className="h-3 w-[1px] bg-white/10" />
-      <div className="flex gap-3 text-slate-500">
-        <span>VRAM: <span className="text-slate-300">{health.hardware?.vram_free_gb}GB</span></span>
-        <span>RAM: <span className="text-slate-300">{health.hardware?.ram_usage_percent}%</span></span>
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/5 text-[10px] font-medium tracking-tight shadow-2xl">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${engine.state === 'busy' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.4)]'}`} />
+          <span className="text-slate-300 uppercase tracking-widest">{engine.state === 'busy' ? 'Engine Busy' : 'Engine Idle'}</span>
+        </div>
+        <div className="h-4 w-[1px] bg-white/10" />
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${engine.model_loaded ? 'bg-blue-500' : 'bg-slate-600'}`} />
+          <span className="text-slate-400 uppercase tracking-widest">Model: {engine.model_loaded ? 'Ready' : 'Unloaded'}</span>
+        </div>
+        <div className="h-4 w-[1px] bg-white/10" />
+        <div className="flex gap-4 text-slate-500">
+          <span>VRAM: <span className="text-slate-200">{health.hardware?.vram_free_gb}GB</span></span>
+          <span>GPU: <span className="text-slate-200">{health.hardware?.gpu?.split(' ')[0] || 'Unknown'}</span></span>
+        </div>
       </div>
     </div>
   );
@@ -170,6 +179,7 @@ const AIGeneratorTab = () => {
 
   const [errorInfo, setErrorInfo] = useState(null);
   const [queuePosition, setQueuePosition] = useState(0);
+  const [currentJobId, setCurrentJobId] = useState(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
@@ -190,28 +200,34 @@ const AIGeneratorTab = () => {
       });
 
       const { job_id } = response.data;
+      setCurrentJobId(job_id);
 
-      const pollInterval = setInterval(async () => {
-        try {
-          const statusRes = await window.axios.get(`http://localhost:8080/api/job/${job_id}`);
-          const data = statusRes.data;
-
-          if (data.status === 'completed') {
-            clearInterval(pollInterval);
-            setGeneratedImage(data.result.image_url || data.result);
-            setHasResult(true);
-            setIsGenerating(false);
-          } else if (data.status === 'failed') {
-            clearInterval(pollInterval);
-            setIsGenerating(false);
-            setErrorInfo(data.error || { message: 'Inference failed' });
-          } else if (data.status === 'queued') {
-            setQueuePosition(data.position || 0);
-          }
-        } catch (e) {
-          console.error("Polling error", e);
+      // SSE approach for real-time responsiveness
+      const eventSource = new EventSource(`http://localhost:8080/api/job/${job_id}/events`);
+      
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.status === 'completed') {
+          eventSource.close();
+          setGeneratedImage(data.result.image_url);
+          setHasResult(true);
+          setIsGenerating(false);
+          setCurrentJobId(null);
+        } else if (data.status === 'failed' || data.status === 'cancelled') {
+          eventSource.close();
+          setIsGenerating(false);
+          setErrorInfo(data.error || { message: data.status === 'cancelled' ? 'Inference stopped.' : 'Inference failed.' });
+          setCurrentJobId(null);
+        } else if (data.status === 'queued') {
+          setQueuePosition(data.position || 0);
         }
-      }, 1000);
+      };
+
+      eventSource.onerror = () => {
+        eventSource.close();
+        // Fallback to polling if SSE fails
+        startPolling(job_id);
+      };
 
     } catch (error) {
       console.error("Submission error", error);
@@ -221,11 +237,46 @@ const AIGeneratorTab = () => {
     }
   };
 
-  const handleRecover = async () => {
+  const startPolling = (job_id) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusRes = await window.axios.get(`http://localhost:8080/api/job/${job_id}`);
+        const data = statusRes.data;
+
+        if (data.status === 'completed') {
+          clearInterval(pollInterval);
+          setGeneratedImage(data.result.image_url);
+          setHasResult(true);
+          setIsGenerating(false);
+          setCurrentJobId(null);
+        } else if (data.status === 'failed') {
+          clearInterval(pollInterval);
+          setIsGenerating(false);
+          setErrorInfo(data.error || { message: 'Inference failed' });
+          setCurrentJobId(null);
+        } else if (data.status === 'queued') {
+          setQueuePosition(data.position || 0);
+        }
+      } catch (e) { console.error("Poll failed", e); }
+    }, 2000);
+  };
+
+  const handleCancel = async () => {
+    if (!currentJobId) return;
     try {
-      await window.axios.post('http://localhost:8080/api/recover');
+      await window.axios.delete(`http://localhost:8080/api/job/${currentJobId}`);
+      setIsGenerating(false);
+      setCurrentJobId(null);
+      setErrorInfo({ error_code: 'CANCELLED', message: 'Inference stopped by user.' });
+    } catch (e) { alert('Cancel failed'); }
+  };
+
+  const handleRecover = async (deep = false) => {
+    try {
+      const endpoint = deep ? '/api/reload-model' : '/api/recover';
+      await window.axios.post(`http://localhost:8080${endpoint}`);
       setErrorInfo(null);
-      alert('GPU Cache Cleared. You can try generating again!');
+      alert(deep ? 'AI Engine Reloaded!' : 'GPU Cache Cleared!');
     } catch (e) {
       alert('Recovery failed. Restarting backend recommended.');
     }
@@ -237,20 +288,26 @@ const AIGeneratorTab = () => {
       <div className="glass-panel border-red-500/30 p-4 space-y-3 bg-red-500/5 animate-in fade-in slide-in-from-top-2">
         <div className="flex items-center gap-3 text-red-400">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span className="font-bold">Error: {error.error_code || 'Inference Error'}</span>
+          <span className="font-bold">Result: {error.error_code || 'Action Required'}</span>
         </div>
         <p className="text-sm text-slate-300">{error.message || error.error}</p>
         
         <div className="flex gap-3">
           {error.error_code === 'CUDA_OOM' && (
-            <button onClick={handleRecover} className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1.5 rounded-md transition-colors border border-red-500/20">
-              Recover GPU
-            </button>
+            <>
+              <button onClick={() => handleRecover(false)} className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1.5 rounded-md transition-colors border border-red-500/20">
+                Recover GPU
+              </button>
+              <button onClick={() => handleRecover(true)} className="text-xs bg-black/40 hover:bg-black/60 text-slate-300 px-3 py-1.5 rounded-md transition-colors border border-white/10">
+                Restart AI Engine
+              </button>
+            </>
           )}
           <details className="inline-block">
             <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-400 transition-colors py-1.5">View details</summary>
             <pre className="mt-2 text-[10px] text-slate-400 bg-black/40 p-2 rounded border border-white/5 overflow-x-auto">
               ID: {Date.now()}
+              Debug ID: {error.debug_id || 'N/A'}
               {JSON.stringify(error, null, 2)}
             </pre>
           </details>
@@ -300,12 +357,17 @@ const AIGeneratorTab = () => {
             </select>
           </div>
           <button 
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className={`btn-primary flex items-center space-x-2 ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={isGenerating ? handleCancel : handleGenerate}
+            className={`btn-primary flex items-center space-x-2 ${isGenerating ? 'bg-red-500 hover:bg-red-600' : ''}`}
           >
-            <span>{isGenerating ? 'Generating...' : 'Generate'}</span>
-            <svg className={isGenerating ? 'animate-spin' : ''} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+            <span>{isGenerating ? 'Cancel Generation' : 'Generate'}</span>
+            <svg className={isGenerating ? 'animate-spin' : ''} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              {isGenerating ? (
+                <path d="M18 6L6 18M6 6l12 12" />
+              ) : (
+                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+              )}
+            </svg>
           </button>
         </div>
       </div>
