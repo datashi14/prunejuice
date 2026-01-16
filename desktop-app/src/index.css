@@ -2,27 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #111827;
+@layer base {
+  body {
+    @apply bg-background text-slate-200 font-sans selection:bg-accent/30;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+  }
+  
+  .glass-sidebar {
+    @apply bg-sidebar/80 backdrop-blur-2xl border-r border-white/5;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-accent text-white font-medium py-2 px-6 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40;
+  }
+
+  .input-field {
+    @apply bg-secondary/50 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all text-white placeholder-slate-500;
+  }
+
+  .sidebar-icon {
+    @apply w-12 h-12 flex items-center justify-center rounded-xl transition-all duration-200 text-slate-400 hover:text-white hover:bg-white/10;
+  }
+
+  .sidebar-icon.active {
+    @apply bg-accent text-white shadow-lg shadow-accent/40;
+  }
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #1f2937;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
+  @apply bg-slate-700/50 rounded-full hover:bg-slate-600;
 }

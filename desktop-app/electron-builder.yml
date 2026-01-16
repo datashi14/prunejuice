@@ -5,6 +5,7 @@ directories:
   buildResources: assets
 files:
   - "**/*"
+  - "dist-react/**/*"
   - "!**/*.ts"
   - "!*.map"
   - "!package-lock.json"

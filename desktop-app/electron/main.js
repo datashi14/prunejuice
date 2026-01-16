@@ -88,18 +88,14 @@ class DesktopApp {
             }
         });
 
-        // Load the React App
-        // In Dev: localhost:3000
-        // In Prod: index.html
-        const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, '../build/index.html')}`;
+        const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
         
-        // During dev, we might just load the local React dev server
-        // this.mainWindow.loadURL('http://localhost:3000');
-        
-        // For this file generation, we'll assume we build the React app later.
-        // We'll point to a placeholder or the dev server.
-        this.mainWindow.loadURL('http://localhost:3000'); 
-    }
+        if (isDev) {
+            this.mainWindow.loadURL('http://localhost:3000');
+            // this.mainWindow.webContents.openDevTools();
+        } else {
+            this.mainWindow.loadFile(path.join(__dirname, '../dist-react/index.html'));
+        }    }
 
     createTray() {
         this.tray = new Tray(path.join(__dirname, 'assets/icon.png')); // Placeholder path
