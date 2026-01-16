@@ -6,20 +6,17 @@ This document tracks known issues in the current release. We believe in transpar
 
 ## 🔶 v0.1.0 Alpha
 
-### 1. xFormers Incompatibility with CUDA Torch 2.6.0+cu124
+### 1. xFormers Dependency Replaced by Native SDPA (Torch 2.6)
 
-**Status**: Open  
-**Severity**: Low (Performance impact only)  
-**Affects**: Users attempting to install xFormers for speed optimization
+**Status**: Resolved / Integrated  
+**Severity**: Low (Informational)  
+**Affects**: Performance optimization
 
 **Description**:  
-The latest xFormers package (0.0.33.post2) requires torch 2.9.1, which conflicts with the CUDA-enabled torch 2.6.0+cu124 needed for GPU acceleration. Installing xFormers will downgrade torch to a CPU-only version.
+We have migrated the inference engine to utilize native **Scaled Dot Product Attention (SDPA)** available in Torch 2.6. This provides near-parity with xFormers performance without the version-hell dependency conflicts.
 
 **Workaround**:  
-Do not install xFormers. The application works correctly without it, just with slightly longer generation times (~20-30% slower).
-
-**Resolution**:  
-Waiting for xFormers to release a version compatible with torch 2.6.x+cu124.
+None needed. Acceleration is now baked into the native runtime.
 
 ---
 
@@ -40,20 +37,17 @@ Future versions may include a "preload model" option during startup.
 
 ---
 
-### 3. Design Tab Requires Docker for Penpot
+### 3. Design Tab Auto-Connects to Docker
 
-**Status**: By Design (Alpha)  
-**Severity**: Medium  
-**Affects**: Users wanting to use the Design canvas
+**Status**: Alpha Feature  
+**Severity**: Low  
+**Affects**: Users using Penpot
 
 **Description**:  
-The Design tab shows a placeholder instead of the Penpot editor unless Penpot is running via Docker. This is intentional for the Alpha release to keep the installer size manageable.
+The Design tab now automatically attempts to connect to a local Penpot instance at `http://localhost:9001`. If it is not running (e.g. via Docker Desktop), a workaround instruction page is shown.
 
 **Workaround**:  
-Run `docker-compose up -d` in the project root to start Penpot services. Penpot will then be available at http://localhost:9001 and embedded in the Design tab.
-
-**Resolution**:  
-Future releases may include a bundled lightweight canvas or optional Penpot download during installation.
+Run `docker-compose up -d` and click "Retry Connection" in the app.
 
 ---
 

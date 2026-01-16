@@ -13,6 +13,15 @@
 - 🔒 **Private**: Your work stays on your PC. No cloud uploads.
 - 💸 **Free**: No subscriptions. No credits to buy. Forever.
 
+## Engineering Highlights (ML/Inference)
+
+- 🚀 **Inference Pipeline**: Orchestrated local Stable Diffusion XL (SDXL) pipeline with multi-process bridge.
+- ⚡ **GPU Acceleration**: Native Torch 2.6 SDPA (Scaled Dot Product Attention) kernels for high-speed, xFormers-free inference.
+- 📉 **VRAM Management**: Dynamic model offloading and memory cleanup, targeted at consumer GPUs (8GB+).
+- ✨ **Prompt Enhancement**: Intelligent prompt expansion engine for professional-grade results from simple seeds.
+- 🏗️ **Architecture**: Decoupled Electron/React UI and Python/FastAPI inference bridge for runtime stability and isolation.
+- 📊 **Performance Benchmarking**: Integrated E2E testing for tracking generation latency and hardware-specific optimizations.
+
 ## Get Started
 
 ### 1. Download

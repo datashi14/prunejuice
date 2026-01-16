@@ -2,15 +2,11 @@ import os
 import torch
 import sys
 import time
-from typing import Dict, Any
 
 # Ensure we can import from optimization
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from optimization.vram_manager import VRAMManager
-from optimization.pruning import ModelPruner # Used for loading logic
-# from optimization.quantization import ModelQuantizer 
-
 from diffusers import StableDiffusionXLPipeline, DPMSolverMultistepScheduler
 
 class FooocusConnector:
@@ -56,12 +52,21 @@ class FooocusConnector:
             load_path = model_id # Fallback to HF
 
         try:
+            # OPTIMIZATION: Use Native SDPA (Scaled Dot Product Attention) in Torch 2.6+
+            print("Activating Native SDPA Backends...")
+            torch.backends.cuda.enable_flash_sdp(True)
+            torch.backends.cuda.enable_mem_efficient_sdp(True)
+            torch.backends.cuda.enable_math_sdp(False) # Disable slow fallback math kernel
+
             self.pipe = StableDiffusionXLPipeline.from_pretrained(
                 load_path,
                 torch_dtype=torch.float16,
                 use_safetensors=True,
                 variant="fp16" # Ensure we try to get fp16 weights
             )
+            
+            # Additional ML Quality/Speed tweaks
+            # self.pipe.enable_freeu(s1=0.9, s2=0.2, b1=1.2, b2=1.4) 
             
             # Scheduler
             self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config, use_karras_sigmas=True)
