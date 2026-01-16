@@ -79,7 +79,7 @@ class DesktopApp {
         this.mainWindow = new BrowserWindow({
             width: 1600,
             height: 900,
-            title: 'Open Creative Suite',
+            title: 'Prune Juice',
             icon: path.join(__dirname, 'assets/icon.png'),
             webPreferences: {
                 nodeIntegration: true,
@@ -107,7 +107,7 @@ class DesktopApp {
             { label: 'Open Creative Suite', click: () => this.mainWindow.show() },
             { label: 'Quit', click: () => app.quit() }
         ]);
-        this.tray.setToolTip('Open Creative Suite');
+        this.tray.setToolTip('Prune Juice');
         this.tray.setContextMenu(contextMenu);
     }
 }

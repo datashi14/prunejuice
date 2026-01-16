@@ -4,7 +4,7 @@ import './index.css';
 // Components
 const TabBar = ({ activeTab, onTabChange }) => (
   <div className="flex flex-col w-16 bg-gray-900 border-r border-gray-800 h-full">
-    <div className="p-4 font-bold text-center text-blue-500">OCS</div>
+    <div className="p-4 font-bold text-center text-blue-500">PJ</div>
     <TabIcon icon="🎨" label="Design" active={activeTab === 'design'} onClick={() => onTabChange('design')} />
     <TabIcon icon="🤖" label="AI" active={activeTab === 'ai'} onClick={() => onTabChange('ai')} />
     <TabIcon icon="📋" label="Templates" active={activeTab === 'templates'} onClick={() => onTabChange('templates')} />

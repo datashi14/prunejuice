@@ -1,5 +1,5 @@
 appId: com.prunejuice.ocs
-productName: Open Creative Suite
+productName: Prune Juice
 directories:
   output: dist
   buildResources: assets
@@ -10,7 +10,7 @@ files:
   - "!package-lock.json"
 win:
   target: nsis
-  icon: assets/icon.ico
+#   icon: assets/icon.ico
 mac:
   target: dmg
   icon: assets/icon.icns

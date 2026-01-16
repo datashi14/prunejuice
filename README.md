@@ -1,4 +1,4 @@
-# Open Creative Suite
+# Prune Juice
 
 > **Your Personal AI Design Studio. Free. Private. Unlimited.**
 
@@ -6,7 +6,7 @@
 
 ## What is it?
 
-**Open Creative Suite** is a unified professional creative workspace that runs completely on your computer.
+**Prune Juice** is a unified professional creative workspace that runs completely on your computer.
 
 - 🎨 **Design**: Professional vector graphics and layout tools (powered by **Penpot**).
 - 🤖 **Create**: Generate unlimited AI images in seconds (powered by **Fooocus/SDXL**).
@@ -95,4 +95,4 @@ We thank these teams for their contribution to open source.
 
 ## License
 
-MIT © Open Creative Suite Team
+MIT © Prune Juice Team
