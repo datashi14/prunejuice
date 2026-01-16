@@ -2,7 +2,7 @@
 
 > **Your Personal AI Design Studio. Free. Private. Unlimited.**
 
-![App Screenshot](https://via.placeholder.com/1200x600?text=App+Screenshot+Here)
+![App Screenshot](https://placehold.co/1200x600/1f2937/ffffff.png?text=Open+Creative+Suite+Preview)
 
 ## What is it?
 
