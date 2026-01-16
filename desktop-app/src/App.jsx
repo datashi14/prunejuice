@@ -30,11 +30,53 @@ const SidebarItem = ({ active, icon: Icon, onClick }) => (
   </button>
 );
 
-const DesignTab = () => (
-  <div className="w-full h-full bg-[#1e1e1e]">
-    <iframe src="http://localhost:9001" className="w-full h-full border-none" title="Penpot Design Space" />
-  </div>
-);
+const DesignTab = () => {
+  const [error, setError] = useState(false);
+  
+  return (
+    <div className="w-full h-full bg-[#1e1e1e] flex items-center justify-center">
+      {error ? (
+        <div className="text-center space-y-4 p-8">
+          <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
+            <Icons.Design />
+          </div>
+          <h2 className="text-2xl font-bold text-white">Design Canvas Coming Soon</h2>
+          <p className="text-slate-400 max-w-md">
+            The full Penpot design integration requires running the Penpot server locally.
+            For this Alpha, use the <strong className="text-accent">AI Generator</strong> tab to create amazing images!
+          </p>
+          <div className="pt-4">
+            <a 
+              href="https://penpot.app" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="btn-primary inline-flex items-center gap-2"
+            >
+              Learn about Penpot
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
+          </div>
+        </div>
+      ) : (
+        <iframe 
+          src="http://localhost:9001" 
+          className="w-full h-full border-none" 
+          title="Penpot Design Space"
+          onError={() => setError(true)}
+          onLoad={(e) => {
+            // Check if iframe loaded correctly
+            try {
+              // If we can't access contentWindow, it's a different origin and probably loaded
+              e.target.contentWindow.location.href;
+            } catch {
+              // Cross-origin is fine, Penpot is running
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+};
 
 const AIGeneratorTab = () => {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -77,7 +119,8 @@ const AIGeneratorTab = () => {
 
           if (status === 'completed') {
             clearInterval(pollInterval);
-            setGeneratedImage(result); // Assuming result is URL or base64
+            // Result contains { image_url: "http://..." }
+            setGeneratedImage(result.image_url || result);
             setHasResult(true);
             setIsGenerating(false);
           } else if (status === 'failed') {

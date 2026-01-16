@@ -2,7 +2,6 @@ import subprocess
 import time
 import requests
 import os
-import signal
 import sys
 import psutil
 
