@@ -13,6 +13,7 @@ class BridgeServer {
         this.pythonProcess = null;
         this.queue = [];
         this.processing = false;
+        this.completedJobs = {}; // Simple in-memory result cache
         
         this.setupMiddleware();
         this.setupRoutes();
@@ -44,6 +45,30 @@ class BridgeServer {
                 processing: this.processing,
                 current_job: this.currentJob || null
             });
+        });
+
+        // Job Status poll
+        this.app.get('/api/job/:id', (req, res) => {
+            const jobId = req.params.id;
+            
+            // Check active job
+            if (this.currentJob && this.currentJob.id === jobId) {
+                return res.json({ status: 'processing' });
+            }
+            
+            // Check queue
+            const queuedJob = this.queue.find(j => j.id === jobId);
+            if (queuedJob) {
+                return res.json({ status: 'queued', position: this.queue.indexOf(queuedJob) });
+            }
+
+            // Check completed cache (Simple in-memory cache for prototype)
+            // In a real app, use Redis or SQLite
+            if (this.completedJobs && this.completedJobs[jobId]) {
+                return res.json(this.completedJobs[jobId]);
+            }
+            
+            res.status(404).json({ error: 'Job not found' });
         });
     }
 
@@ -130,6 +155,11 @@ class BridgeServer {
 
             const response = await axios.post(`http://localhost:8000${endpoint}`, this.currentJob.params);
             
+            this.completedJobs[this.currentJob.id] = {
+                status: 'completed',
+                result: response.data
+            };
+
             this.broadcast({
                 event: 'job_completed',
                 job_id: this.currentJob.id,

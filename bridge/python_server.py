@@ -9,11 +9,12 @@ from typing import Optional, List
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from bridge.fooocus_connector import FooocusConnector
-    from bridge.presets import list_presets, get_preset
-except ImportError:
     from fooocus_connector import FooocusConnector
     from presets import list_presets, get_preset
+except ImportError:
+    # Fallback if running from different directory
+    from bridge.fooocus_connector import FooocusConnector
+    from bridge.presets import list_presets, get_preset
 
 app = FastAPI()
 connector = FooocusConnector()

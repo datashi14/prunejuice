@@ -52,10 +52,25 @@ class DesktopApp {
         console.log('Starting backend services...');
 
         // 1. Start Bridge Server (Node)
-        const bridgePath = path.join(__dirname, '../../bridge/api-server.js');
+        // 1. Start Bridge Server (Node)
+        let bridgePath;
+        let bridgeCwd;
+        
+        if (app.isPackaged) {
+            // In production, 'bridge' is copied to 'resources/bridge' via extraResources
+            bridgePath = path.join(process.resourcesPath, 'bridge', 'api-server.js');
+            bridgeCwd = path.join(process.resourcesPath, 'bridge');
+        } else {
+            // In development
+            bridgePath = path.join(__dirname, '../../bridge/api-server.js');
+            bridgeCwd = path.join(__dirname, '../../bridge');
+        }
+
+        console.log(`Launching Bridge from: ${bridgePath}`);
+        
         this.bridgeProcess = spawn('node', [bridgePath], {
-            cwd: path.join(__dirname, '../../bridge'),
-            stdio: 'inherit' // Pipe output for debug
+            cwd: bridgeCwd,
+            stdio: 'inherit'
         });
 
         // 2. Start Python Backend
