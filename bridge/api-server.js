@@ -23,6 +23,8 @@ class BridgeServer {
     setupMiddleware() {
         this.app.use(cors());
         this.app.use(bodyParser.json());
+        // Serve the outputs folder so the frontend can display images
+        this.app.use('/outputs', express.static(path.join(__dirname, '../outputs')));
     }
 
     setupRoutes() {
@@ -155,15 +157,23 @@ class BridgeServer {
 
             const response = await axios.post(`http://localhost:8000${endpoint}`, this.currentJob.params);
             
+            let resultData = response.data;
+            
+            // If the python backend returns an absolute path, convert it to a URL
+            if (resultData && resultData.image_url) {
+                const fileName = path.basename(resultData.image_url);
+                resultData.image_url = `http://localhost:${this.port}/outputs/${fileName}`;
+            }
+
             this.completedJobs[this.currentJob.id] = {
                 status: 'completed',
-                result: response.data
+                result: resultData
             };
 
             this.broadcast({
                 event: 'job_completed',
                 job_id: this.currentJob.id,
-                result: response.data
+                result: resultData
             });
 
         } catch (error) {

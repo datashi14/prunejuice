@@ -113,16 +113,26 @@ def run_e2e_test():
                 if status == 'completed':
                     print("✅ Generation COMPLETED!")
                     result_data = status_data['result']
-                    # Handle nested structure if necessary (sometimes result uses 'image_url')
-                    image_path = result_data.get('image_url')
-                    print(f"Image Path: {image_path}")
+                    image_url = result_data.get('image_url')
+                    print(f"Image URL: {image_url}")
                     
-                    # Check file existence
-                    if image_path and os.path.exists(image_path):
-                         print("✅ File actually exists on disk.")
+                    # 1. Check if URL is served
+                    try:
+                        img_res = requests.get(image_url)
+                        img_res.raise_for_status()
+                        print(f"✅ Image is SERVED correctly at {image_url}")
+                    except Exception as e:
+                        print(f"❌ Image is NOT served: {e}")
+                        raise e
+
+                    # 2. Check file existence on disk (optional but good for testing)
+                    filename = os.path.basename(image_url)
+                    local_path = os.path.join(PROJECT_ROOT, "outputs", filename)
+                    if os.path.exists(local_path):
+                         print(f"✅ File exists on disk at: {local_path}")
                     else:
-                         print(f"❌ File missing from disk! Path: {image_path}")
-                         raise Exception("File missing")
+                         print(f"❌ File missing from disk at: {local_path}")
+                         raise Exception("File missing on disk")
                     break
                 elif status == 'failed':
                     print("❌ Generation FAILED at backend.")
