@@ -1,9 +1,71 @@
-version: "3.8"
 services:
+  # AI Backend API (optional - can also run directly with python)
   api:
     build: .
-    command: uvicorn bridge.api-server:app --host 0.0.0.0 --port 8000
+    command: uvicorn bridge.python_server:app --host 0.0.0.0 --port 8000
     volumes:
       - .:/app
     ports:
       - "8000:8000"
+
+  # Penpot - Open Source Design Platform
+  penpot-frontend:
+    image: penpotapp/frontend:latest
+    restart: always
+    ports:
+      - "9001:80"
+    volumes:
+      - penpot_assets:/opt/data/assets
+    depends_on:
+      - penpot-backend
+      - penpot-exporter
+    environment:
+      - PENPOT_FLAGS=enable-registration enable-login-with-password
+
+  penpot-backend:
+    image: penpotapp/backend:latest
+    restart: always
+    volumes:
+      - penpot_assets:/opt/data/assets
+    depends_on:
+      - penpot-postgres
+      - penpot-redis
+    environment:
+      - PENPOT_FLAGS=enable-registration enable-login-with-password disable-email-verification
+      - PENPOT_SECRET_KEY=my-insecure-secret-key-change-in-production
+      - PENPOT_PREPL_HOST=0.0.0.0
+      - PENPOT_PUBLIC_URI=http://localhost:9001
+      - PENPOT_DATABASE_URI=postgresql://penpot-postgres/penpot
+      - PENPOT_DATABASE_USERNAME=penpot
+      - PENPOT_DATABASE_PASSWORD=penpot
+      - PENPOT_REDIS_URI=redis://penpot-redis/0
+      - PENPOT_ASSETS_STORAGE_BACKEND=assets-fs
+      - PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets
+      - PENPOT_TELEMETRY_ENABLED=false
+
+  penpot-exporter:
+    image: penpotapp/exporter:latest
+    restart: always
+    environment:
+      - PENPOT_PUBLIC_URI=http://penpot-frontend
+      - PENPOT_REDIS_URI=redis://penpot-redis/0
+
+  penpot-postgres:
+    image: postgres:15
+    restart: always
+    stop_signal: SIGINT
+    volumes:
+      - penpot_postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_INITDB_ARGS=--data-checksums
+      - POSTGRES_DB=penpot
+      - POSTGRES_USER=penpot
+      - POSTGRES_PASSWORD=penpot
+
+  penpot-redis:
+    image: redis:7
+    restart: always
+
+volumes:
+  penpot_postgres:
+  penpot_assets:
