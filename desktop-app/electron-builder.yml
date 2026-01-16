@@ -1,0 +1,30 @@
+appId: com.prunejuice.ocs
+productName: Open Creative Suite
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - "**/*"
+  - "!**/*.ts"
+  - "!*.map"
+  - "!package-lock.json"
+win:
+  target: nsis
+  icon: assets/icon.ico
+mac:
+  target: dmg
+  icon: assets/icon.icns
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Graphics
+extraResources:
+  - from: ../bridge
+    to: bridge
+  - from: ../optimization
+    to: optimization
+  - from: ../templates
+    to: templates

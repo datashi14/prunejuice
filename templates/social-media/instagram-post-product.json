@@ -1,0 +1,31 @@
+{
+  "id": "ig-post-product-001",
+  "name": "Minimalist Product Showcase",
+  "category": "social-media",
+  "dimensions": { "width": 1080, "height": 1080 },
+  "ai_prompt": "professional product photography of {product}, white background, soft studio lighting, 8k, highly detailed",
+  "negative_prompt": "blurry, low quality, dark, distorted",
+  "penpot_structure": {
+    "type": "board",
+    "name": "Instagram Post",
+    "x": 0, "y": 0, "width": 1080, "height": 1080,
+    "children": [
+      {
+        "type": "image",
+        "name": "Product Image",
+        "x": 0, "y": 0, "width": 1080, "height": 1080,
+        "src": "{ai_generated_image}"
+      },
+      {
+        "type": "text",
+        "name": "Title",
+        "x": 100, "y": 100,
+        "content": "NEW ARRIVAL",
+        "font": "Inter",
+        "fontSize": 48,
+        "fill": "#000000"
+      }
+    ]
+  },
+  "tags": ["product", "minimalist", "instagram", "square"]
+}

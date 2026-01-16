@@ -1,0 +1,16 @@
+node_modules/
+models/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.input/
+.output/
+dist/
+build/
+.DS_Store
+thumbs.db

@@ -1,0 +1,31 @@
+{
+  "id": "biz-card-modern-001",
+  "name": "Modern Business Card",
+  "category": "marketing",
+  "dimensions": { "width": 1050, "height": 600 },
+  "ai_prompt": "abstract geometric background, corporate blue and white, clean lines, high quality, 4k",
+  "penpot_structure": {
+    "type": "board",
+    "width": 1050, "height": 600,
+    "children": [
+      {
+        "type": "image",
+        "name": "Background",
+        "width": 1050, "height": 600,
+        "src": "{ai_generated_image}"
+      },
+      {
+        "type": "rect",
+        "width": 1050, "height": 600,
+        "fill": "#ffffff80"
+      },
+      {
+        "type": "text",
+        "content": "John Doe",
+        "x": 100, "y": 200,
+        "fontSize": 64
+      }
+    ]
+  },
+  "tags": ["business", "card", "corporate"]
+}
