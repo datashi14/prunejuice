@@ -70,6 +70,29 @@ class PenpotConnector {
         // Logic to add the image to the active Penpot board
         console.log(`Inserting ${imageUrl} into Penpot canvas`);
     }
+
+    /**
+     * Update an existing image on the canvas with a new source
+     * This enables real-time editing workflows (AI enhance, replace, etc.)
+     * @param {string} elementId - The ID of the canvas element to update
+     * @param {string} imageUrl - The new image URL or base64 data
+     */
+    updateImage(elementId, imageUrl) {
+        console.log(`Updating element ${elementId} with ${imageUrl}`);
+        // In a real implementation, this would:
+        // 1. Find the element in the Penpot document tree
+        // 2. Replace its image source
+        // 3. Trigger a canvas refresh
+        // This requires deeper integration with Penpot's API
+        
+        // Example postMessage to parent Electron window:
+        if (typeof window !== 'undefined' && window.parent) {
+            window.parent.postMessage({
+                type: 'PENPOT_UPDATE_IMAGE',
+                payload: { elementId, imageUrl }
+            }, '*');
+        }
+    }
 }
 
 // Ensure it's available globally or as a module
