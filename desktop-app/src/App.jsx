@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import axios from 'axios';
+
+// Expose axios to window just in case, or use directly.
+window.axios = axios;
 
 // --- Icons (Using Inline SVGs for no-dependency robustness) ---
 const Icons = {
@@ -36,13 +40,61 @@ const AIGeneratorTab = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasResult, setHasResult] = useState(false);
 
-  const handleGenerate = () => {
+  // Import axios manually or ensure it's available in scope
+  // For simplicity in this single-file React component, we assume axios is imported at top or available window.
+  // Ideally: import axios from 'axios'; inside your project setup.
+  
+  const [prompt, setPrompt] = useState('');
+  const [style, setStyle] = useState('Photographic');
+  const [size, setSize] = useState('1024x1024');
+  const [generatedImage, setGeneratedImage] = useState(null);
+
+  const handleGenerate = async () => {
+    if (!prompt) return;
     setIsGenerating(true);
-    // Mock generation for 3 seconds
-    setTimeout(() => {
+    setHasResult(false);
+    setGeneratedImage(null);
+
+    try {
+      // 1. Submit Job
+      // Parse size string '1024x1024' -> width, height
+      const [width, height] = size.split('x').map(Number) || [1024, 1024]; // Fallback to square if splitting fails, though 'x' is expected.
+
+      const response = await window.axios.post('http://localhost:8080/api/generate', {
+        prompt: prompt,
+        width: width,
+        height: height,
+        style: style.toLowerCase()
+      });
+
+      const { job_id } = response.data;
+
+      // 2. Poll for Status
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusRes = await window.axios.get(`http://localhost:8080/api/job/${job_id}`);
+          const { status, result } = statusRes.data;
+
+          if (status === 'completed') {
+            clearInterval(pollInterval);
+            setGeneratedImage(result); // Assuming result is URL or base64
+            setHasResult(true);
+            setIsGenerating(false);
+          } else if (status === 'failed') {
+            clearInterval(pollInterval);
+            setIsGenerating(false);
+            alert('Generation Failed');
+          }
+        } catch (e) {
+          console.error("Polling error", e);
+        }
+      }, 1000);
+
+    } catch (error) {
+      console.error("Generation error", error);
       setIsGenerating(false);
-      setHasResult(true);
-    }, 3000);
+      alert('Failed to start generation. Make sure the Bridge is running!');
+    }
   };
 
   return (
@@ -56,18 +108,28 @@ const AIGeneratorTab = () => {
         <textarea 
           className="input-field w-full h-32 resize-none"
           placeholder="A futuristic hydroponic garden in a cyberpunk city, highly detailed, neon lights..."
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
         />
         <div className="flex items-center justify-between">
           <div className="flex space-x-4">
-            <select className="input-field bg-slate-800 text-sm">
-              <option>1024x1024 (Square)</option>
-              <option>1024x1792 (Tall)</option>
-              <option>1792x1024 (Wide)</option>
+            <select 
+              className="input-field bg-slate-800 text-sm"
+              value={size}
+              onChange={(e) => setSize(e.target.value)}
+            >
+              <option value="1024x1024">1024x1024 (Square)</option>
+              <option value="1024x1792">1024x1792 (Tall)</option>
+              <option value="1792x1024">1792x1024 (Wide)</option>
             </select>
-            <select className="input-field bg-slate-800 text-sm">
-              <option>Photographic</option>
-              <option>Anime</option>
-              <option>Cinematic</option>
+            <select 
+              className="input-field bg-slate-800 text-sm"
+              value={style}
+              onChange={(e) => setStyle(e.target.value)}
+            >
+              <option value="Photographic">Photographic</option>
+              <option value="Anime">Anime</option>
+              <option value="Cinematic">Cinematic</option>
             </select>
           </div>
           <button 
@@ -92,9 +154,17 @@ const AIGeneratorTab = () => {
                 <p className="text-accent animate-pulse">Dreaming up your pixels...</p>
              </div>
           ) : hasResult ? (
-            <div className="p-4 border border-accent/20 rounded-xl bg-accent/5">
-                <p className="text-white">Image Generation Complete! (Result Mockup)</p>
-                <p className="text-xs text-slate-500 mt-2">In high-res mode • 1.2s</p>
+            <div className="relative group w-full h-full flex items-center justify-center p-4">
+                <img 
+                  src={generatedImage} 
+                  alt="Generated Masterpiece" 
+                  className="max-h-full max-w-full rounded-lg shadow-2xl border border-white/10"
+                />
+                <div className="absolute bottom-6 right-6 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button className="bg-black/50 hover:bg-black/70 text-white p-2 rounded-lg backdrop-blur-md transition-colors">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  </button>
+                </div>
             </div>
           ) : (
             <>
