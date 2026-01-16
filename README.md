@@ -17,12 +17,19 @@
 
 ### 1. Download
 
-Grab the latest version for Windows:
-[👉 **Download Installer (Windows)**](https://github.com/yourusername/open-creative-suite/releases/latest)
+Grab the version for your OS from our [**Releases Page**](https://github.com/datashi14/prunejuice/releases/latest):
+
+- 🪟 **Windows**: `OpenCreativeSuite-Setup.exe`
+- 🍎 **macOS**: `OpenCreativeSuite.dmg`
+- 🐧 **Linux**: `OpenCreativeSuite.AppImage`
 
 ### 2. Install
 
-Run `OpenCreativeSuite-Setup.exe`. It will automatically set up everything you need.
+- **Windows**: Run the installer.
+- **Mac**: Drag to Applications.
+- **Linux**: Make executable and run.
+
+See [docs/installation.md](docs/installation.md) for full details.
 
 ### 3. Create
 
@@ -37,8 +44,21 @@ Run `OpenCreativeSuite-Setup.exe`. It will automatically set up everything you n
 
 To run this smoothly, your computer needs:
 
+### Windows
+
 - **Windows 10 or 11**
 - **NVIDIA Graphics Card** (RTX 3060, 3070, or better recommended)
+- **16GB RAM**
+
+### macOS
+
+- **Apple Silicon (M1/M2/M3)** or Intel with valid GPU
+- **16GB RAM** (Unified Memory)
+
+### Linux
+
+- **Ubuntu 22.04+**
+- **NVIDIA GPU** (CUDA 11.8+)
 - **16GB RAM**
 
 ---
