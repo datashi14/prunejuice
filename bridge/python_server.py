@@ -1,9 +1,13 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel
 import uvicorn
 import sys
 import os
-from typing import Optional, List
+import torch
+import psutil
+from typing import Optional
+from starlette.status import HTTP_403_FORBIDDEN
 
 # Add parent directory to path to import optimization modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -11,12 +15,24 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from fooocus_connector import FooocusConnector
     from presets import list_presets, get_preset
+    from security import generate_token
 except ImportError:
-    # Fallback if running from different directory
     from bridge.fooocus_connector import FooocusConnector
     from bridge.presets import list_presets, get_preset
+    from bridge.security import generate_token
 
-app = FastAPI()
+# Initialize App and Security
+app = FastAPI(title="Prunejuice AI Backend")
+BRIDGE_TOKEN = generate_token()
+api_key_header = APIKeyHeader(name="X-Bridge-Token", auto_error=False)
+
+async def get_token_header(api_key: str = Depends(api_key_header)):
+    if api_key == BRIDGE_TOKEN:
+        return api_key
+    raise HTTPException(
+        status_code=HTTP_403_FORBIDDEN, detail="Invalid or missing Bridge Token"
+    )
+
 connector = FooocusConnector()
 
 class GenerateRequest(BaseModel):
@@ -32,16 +48,46 @@ class GenerateRequest(BaseModel):
 class ModelSwitchRequest(BaseModel):
     model_id: str
 
-@app.get("/")
-def read_root():
-    return {"status": "ok", "service": "Prunejuice AI Backend"}
+@app.get("/health")
+def health_check():
+    gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "None"
+    vram_free = 0
+    vram_total = 0
+    if torch.cuda.is_available():
+        vram_free, vram_total = torch.cuda.mem_get_info()
+    
+    return {
+        "status": "ok",
+        "hardware": {
+            "gpu": gpu_name,
+            "vram_free_gb": round(vram_free / (1024**3), 2),
+            "vram_total_gb": round(vram_total / (1024**3), 2),
+            "ram_usage_percent": psutil.virtual_memory().percent,
+            "cuda_available": torch.cuda.is_available(),
+            "torch_version": torch.__version__
+        },
+        "model": {
+            "current": connector.current_model_id,
+            "loaded": connector.pipe is not None
+        }
+    }
+
+@app.post("/recover")
+def recover_gpu(token: str = Depends(get_token_header)):
+    """Force clears CUDA cache to recover from OOM or fragmentation."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        import gc
+        gc.collect()
+        return {"status": "recovered", "freed": True}
+    return {"status": "skipped", "freed": False}
 
 @app.get("/styles")
 def get_styles():
     return list_presets()
 
 @app.post("/generate")
-def generate(req: GenerateRequest):
+def generate(req: GenerateRequest, token: str = Depends(get_token_header)):
     try:
         # Apply style if present
         p_prompt = req.prompt
@@ -67,19 +113,33 @@ def generate(req: GenerateRequest):
             seed=req.seed
         )
         return result
+    except RuntimeError as e:
+        if "out of memory" in str(e).lower():
+            torch.cuda.empty_cache()
+            raise HTTPException(
+                status_code=507, 
+                detail={
+                    "error_code": "CUDA_OOM",
+                    "message": "GPU ran out of memory. Try reducing resolution or closing other apps.",
+                    "details": str(e)
+                }
+            )
+        raise HTTPException(status_code=500, detail={"error_code": "INFERENCE_ERROR", "message": str(e)})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail={"error_code": "INTERNAL_ERROR", "message": str(e)})
 
 @app.get("/models")
 def get_models():
     return connector.list_models()
 
 @app.post("/models/switch")
-def switch_model(req: ModelSwitchRequest):
+def switch_model(req: ModelSwitchRequest, token: str = Depends(get_token_header)):
     success = connector.load_model(req.model_id)
     if not success:
         raise HTTPException(status_code=404, detail="Model not found")
     return {"success": True, "current_model": req.model_id}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Bind to 127.0.0.1 for security
+    print(f"Starting backend with security token: {BRIDGE_TOKEN}")
+    uvicorn.run(app, host="127.0.0.1", port=8000)

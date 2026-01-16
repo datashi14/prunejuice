@@ -30,6 +30,40 @@ const SidebarItem = ({ active, icon: Icon, onClick }) => (
   </button>
 );
 
+const StatusBadge = () => {
+  const [health, setHealth] = React.useState(null);
+
+  React.useEffect(() => {
+    const fetchHealth = async () => {
+      try {
+        const res = await window.axios.get('http://localhost:8080/health');
+        setHealth(res.data.backend);
+      } catch (e) {
+        setHealth('offline');
+      }
+    };
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!health || health === 'offline') return null;
+
+  return (
+    <div className="flex items-center gap-4 bg-black/20 px-4 py-1.5 rounded-full border border-white/5 text-[10px] font-medium tracking-tight">
+      <div className="flex items-center gap-1.5">
+        <div className={`w-1.5 h-1.5 rounded-full ${health.status === 'ok' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'}`} />
+        <span className="text-slate-300 uppercase letter-spacing-widest">{health.hardware?.gpu || 'No GPU'}</span>
+      </div>
+      <div className="h-3 w-[1px] bg-white/10" />
+      <div className="flex gap-3 text-slate-500">
+        <span>VRAM: <span className="text-slate-300">{health.hardware?.vram_free_gb}GB</span></span>
+        <span>RAM: <span className="text-slate-300">{health.hardware?.ram_usage_percent}%</span></span>
+      </div>
+    </div>
+  );
+};
+
 const DesignTab = () => {
   const [isReady, setIsReady] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -134,16 +168,19 @@ const AIGeneratorTab = () => {
   const [size, setSize] = useState('1024x1024');
   const [generatedImage, setGeneratedImage] = useState(null);
 
+  const [errorInfo, setErrorInfo] = useState(null);
+  const [queuePosition, setQueuePosition] = useState(0);
+
   const handleGenerate = async () => {
-    if (!prompt) return;
+    if (!prompt.trim()) return;
+    
     setIsGenerating(true);
     setHasResult(false);
-    setGeneratedImage(null);
+    setErrorInfo(null);
+    setQueuePosition(0);
 
     try {
-      // 1. Submit Job
-      // Parse size string '1024x1024' -> width, height
-      const [width, height] = size.split('x').map(Number) || [1024, 1024]; // Fallback to square if splitting fails, though 'x' is expected.
+      const [width, height] = size.split('x').map(Number) || [1024, 1024];
 
       const response = await window.axios.post('http://localhost:8080/api/generate', {
         prompt: prompt,
@@ -154,22 +191,22 @@ const AIGeneratorTab = () => {
 
       const { job_id } = response.data;
 
-      // 2. Poll for Status
       const pollInterval = setInterval(async () => {
         try {
           const statusRes = await window.axios.get(`http://localhost:8080/api/job/${job_id}`);
-          const { status, result } = statusRes.data;
+          const data = statusRes.data;
 
-          if (status === 'completed') {
+          if (data.status === 'completed') {
             clearInterval(pollInterval);
-            // Result contains { image_url: "http://..." }
-            setGeneratedImage(result.image_url || result);
+            setGeneratedImage(data.result.image_url || data.result);
             setHasResult(true);
             setIsGenerating(false);
-          } else if (status === 'failed') {
+          } else if (data.status === 'failed') {
             clearInterval(pollInterval);
             setIsGenerating(false);
-            alert('Generation Failed');
+            setErrorInfo(data.error || { message: 'Inference failed' });
+          } else if (data.status === 'queued') {
+            setQueuePosition(data.position || 0);
           }
         } catch (e) {
           console.error("Polling error", e);
@@ -177,18 +214,62 @@ const AIGeneratorTab = () => {
       }, 1000);
 
     } catch (error) {
-      console.error("Generation error", error);
+      console.error("Submission error", error);
       setIsGenerating(false);
-      alert('Failed to start generation. Make sure the Bridge is running!');
+      const err = error.response?.data || { message: 'Connection to Bridge failed. Ensure services are running.' };
+      setErrorInfo(err);
     }
+  };
+
+  const handleRecover = async () => {
+    try {
+      await window.axios.post('http://localhost:8080/api/recover');
+      setErrorInfo(null);
+      alert('GPU Cache Cleared. You can try generating again!');
+    } catch (e) {
+      alert('Recovery failed. Restarting backend recommended.');
+    }
+  };
+
+  const ErrorDisplay = ({ error }) => {
+    if (!error) return null;
+    return (
+      <div className="glass-panel border-red-500/30 p-4 space-y-3 bg-red-500/5 animate-in fade-in slide-in-from-top-2">
+        <div className="flex items-center gap-3 text-red-400">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span className="font-bold">Error: {error.error_code || 'Inference Error'}</span>
+        </div>
+        <p className="text-sm text-slate-300">{error.message || error.error}</p>
+        
+        <div className="flex gap-3">
+          {error.error_code === 'CUDA_OOM' && (
+            <button onClick={handleRecover} className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 px-3 py-1.5 rounded-md transition-colors border border-red-500/20">
+              Recover GPU
+            </button>
+          )}
+          <details className="inline-block">
+            <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-400 transition-colors py-1.5">View details</summary>
+            <pre className="mt-2 text-[10px] text-slate-400 bg-black/40 p-2 rounded border border-white/5 overflow-x-auto">
+              ID: {Date.now()}
+              {JSON.stringify(error, null, 2)}
+            </pre>
+          </details>
+        </div>
+      </div>
+    );
   };
 
   return (
     <div className="flex flex-col p-8 max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">AI Image Generator</h1>
-        <p className="text-slate-400">Describe what you want to create and let Prune Juice do the magic.</p>
+      <div className="flex justify-between items-start">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">AI Image Generator</h1>
+          <p className="text-slate-400">Describe what you want to create and let Prune Juice do the magic.</p>
+        </div>
+        <StatusBadge />
       </div>
+
+      <ErrorDisplay error={errorInfo} />
 
       <div className="glass-panel p-6 space-y-4">
         <textarea 
@@ -237,7 +318,9 @@ const AIGeneratorTab = () => {
                 <div className="w-16 h-1 bg-accent/20 rounded-full overflow-hidden mx-auto">
                     <div className="h-full bg-accent animate-[loading_2s_ease-in-out_infinite]" style={{ width: '30%' }} />
                 </div>
-                <p className="text-accent animate-pulse">Dreaming up your pixels...</p>
+                <p className="text-accent animate-pulse">
+                  {queuePosition > 0 ? `In queue (Position: ${queuePosition})...` : 'Dreaming up your pixels...'}
+                </p>
              </div>
           ) : hasResult ? (
             <div className="relative group w-full h-full flex items-center justify-center p-4">

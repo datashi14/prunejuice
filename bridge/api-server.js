@@ -2,8 +2,10 @@ const express = require('express');
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const axios = require('axios');
 
 class BridgeServer {
     constructor() {
@@ -13,7 +15,8 @@ class BridgeServer {
         this.pythonProcess = null;
         this.queue = [];
         this.processing = false;
-        this.completedJobs = {}; // Simple in-memory result cache
+        this.completedJobs = {}; 
+        this.token = null;
         
         this.setupMiddleware();
         this.setupRoutes();
@@ -23,117 +26,124 @@ class BridgeServer {
     setupMiddleware() {
         this.app.use(cors());
         this.app.use(bodyParser.json());
-        // Serve the outputs folder so the frontend can display images
         this.app.use('/outputs', express.static(path.join(__dirname, '../outputs')));
     }
 
+    getToken() {
+        if (this.token) return this.token;
+        const tokenPath = path.join(__dirname, '.bridge_token');
+        if (fs.existsSync(tokenPath)) {
+            this.token = fs.readFileSync(tokenPath, 'utf8').trim();
+            return this.token;
+        }
+        return null;
+    }
+
     setupRoutes() {
-        // Status Check
-        this.app.get('/health', (req, res) => res.json({ status: 'ok' }));
+        // 1. Health & Resource Management
+        this.app.get('/health', async (req, res) => {
+            try {
+                const pythonHealth = await axios.get('http://127.0.0.1:8000/health');
+                res.json({
+                    bridge: 'ok',
+                    backend: pythonHealth.data
+                });
+            } catch (e) {
+                res.json({ bridge: 'ok', backend: 'offline' });
+            }
+        });
 
-        // AI Generation
-        this.app.post('/api/generate', (req, res) => this.handleGenerate(req, res));
-        this.app.post('/api/inpaint', (req, res) => this.handleInpaint(req, res));
-        this.app.post('/api/upscale', (req, res) => this.handleUpscale(req, res));
+        this.app.post('/api/recover', async (req, res) => {
+            try {
+                const response = await axios.post('http://127.0.0.1:8000/recover', {}, {
+                    headers: { 'X-Bridge-Token': this.getToken() }
+                });
+                res.json(response.data);
+            } catch (e) {
+                res.status(500).json({ error: 'Recovery failed', details: e.message });
+            }
+        });
+
+        // 2. Job Protocol
+        this.app.post('/api/generate', (req, res) => this.handleJobSubmission(req, res, 'generate'));
         
-        // Models
-        this.app.get('/api/models', (req, res) => this.proxyToPython(req, res, '/models'));
-        this.app.post('/api/models/switch', (req, res) => this.proxyToPython(req, res, '/models/switch', 'POST'));
-
-        // Queue
+        // 3. Queue & Status
         this.app.get('/api/queue', (req, res) => {
             res.json({
                 length: this.queue.length,
                 processing: this.processing,
-                current_job: this.currentJob || null
+                current_job: this.currentJob ? { id: this.currentJob.id, type: this.currentJob.type } : null
             });
         });
 
-        // Job Status poll
         this.app.get('/api/job/:id', (req, res) => {
             const jobId = req.params.id;
-            
-            // Check active job
-            if (this.currentJob && this.currentJob.id === jobId) {
-                return res.json({ status: 'processing' });
-            }
-            
-            // Check queue
+            if (this.completedJobs[jobId]) return res.json(this.completedJobs[jobId]);
+            if (this.currentJob && this.currentJob.id === jobId) return res.json({ status: 'processing' });
             const queuedJob = this.queue.find(j => j.id === jobId);
-            if (queuedJob) {
-                return res.json({ status: 'queued', position: this.queue.indexOf(queuedJob) });
-            }
-
-            // Check completed cache (Simple in-memory cache for prototype)
-            // In a real app, use Redis or SQLite
-            if (this.completedJobs && this.completedJobs[jobId]) {
-                return res.json(this.completedJobs[jobId]);
-            }
-            
-            res.status(404).json({ error: 'Job not found' });
+            if (queuedJob) return res.json({ status: 'queued', position: this.queue.indexOf(queuedJob) });
+            res.status(404).json({ error_code: 'JOB_NOT_FOUND', message: 'Job ID does not exist' });
         });
+
+        this.app.delete('/api/job/:id', (req, res) => {
+            const jobId = req.params.id;
+            const index = this.queue.findIndex(j => j.id === jobId);
+            if (index !== -1) {
+                this.queue.splice(index, 1);
+                return res.json({ status: 'cancelled' });
+            }
+            if (this.currentJob && this.currentJob.id === jobId) {
+                // We don't support hard killing python but we can clear it from bridge
+                this.currentJob.cancelled = true;
+                return res.json({ status: 'cancelling', note: 'Will skip next broadcast' });
+            }
+            res.status(404).json({ error: 'Job not found or already finished' });
+        });
+
+        // 4. Proxy Styles & Models
+        this.app.get('/api/styles', (req, res) => this.proxyToPython(req, res, '/styles'));
+        this.app.get('/api/models', (req, res) => this.proxyToPython(req, res, '/models'));
+        this.app.post('/api/models/switch', (req, res) => this.proxyToPython(req, res, '/models/switch', 'POST'));
     }
 
     setupWebSocket() {
         this.wss = new WebSocket.Server({ port: 8081 });
-        this.wss.on('connection', (ws) => {
-            console.log('Client connected to WebSocket');
-            ws.on('message', (message) => {
-                console.log('Received:', message);
-            });
-        });
-        console.log('WebSocket server started on port 8081');
+        console.log('Progress WebSocket started on port 8081');
     }
 
     broadcast(data) {
         if (!this.wss) return;
+        const msg = JSON.stringify(data);
         this.wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify(data));
-            }
+            if (client.readyState === WebSocket.OPEN) client.send(msg);
         });
     }
 
-    async handleGenerate(req, res) {
+    async handleJobSubmission(req, res, type) {
+        // Backpressure: Limit queue size
+        if (this.queue.length > 5) {
+            return res.status(429).json({
+                error_code: 'QUEUE_FULL',
+                message: 'Too many requests. Please wait for current jobs to finish.'
+            });
+        }
+
         const job = {
-            id: Date.now().toString(),
-            type: 'generate',
+            id: `job_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            type,
             params: req.body,
-            status: 'pending'
+            status: 'queued',
+            submitted_at: new Date().toISOString()
         };
 
         this.queue.push(job);
         this.processQueue();
 
-        res.json({ 
+        res.status(202).json({ 
             job_id: job.id, 
             status: 'queued', 
             position: this.queue.length 
         });
-    }
-
-    async handleInpaint(req, res) {
-         const job = {
-            id: Date.now().toString(),
-            type: 'inpaint',
-            params: req.body,
-            status: 'pending'
-        };
-        this.queue.push(job);
-        this.processQueue();
-        res.json({ job_id: job.id, status: 'queued' });
-    }
-
-    async handleUpscale(req, res) {
-         const job = {
-            id: Date.now().toString(),
-            type: 'upscale',
-            params: req.body,
-            status: 'pending'
-        };
-        this.queue.push(job);
-        this.processQueue();
-        res.json({ job_id: job.id, status: 'queued' });
     }
 
     async processQueue() {
@@ -141,95 +151,74 @@ class BridgeServer {
 
         this.processing = true;
         this.currentJob = this.queue.shift();
-
-        this.broadcast({
-            event: 'job_started',
-            job_id: this.currentJob.id
-        });
+        this.broadcast({ event: 'job_started', job_id: this.currentJob.id });
 
         try {
-            // Check if Python server is ready, if not wait or fail
-            // For now, assume Python server is running on port 8000
-            const axios = require('axios'); // Lazy load
+            const endpoint = `/${this.currentJob.type}`;
+            const response = await axios.post(`http://127.0.0.1:8000${endpoint}`, this.currentJob.params, {
+                headers: { 'X-Bridge-Token': this.getToken() },
+                timeout: 300000 // 5 minute timeout for local inference
+            });
             
-            const endpoint = this.currentJob.type === 'generate' ? '/generate' : 
-                             this.currentJob.type === 'inpaint' ? '/inpaint' : '/upscale';
-
-            const response = await axios.post(`http://localhost:8000${endpoint}`, this.currentJob.params);
-            
-            let resultData = response.data;
-            
-            // If the python backend returns an absolute path, convert it to a URL
-            if (resultData && resultData.image_url) {
-                const fileName = path.basename(resultData.image_url);
-                resultData.image_url = `http://localhost:${this.port}/outputs/${fileName}`;
+            let result = response.data;
+            if (result && result.image_url) {
+                const fileName = path.basename(result.image_url);
+                result.image_url = `http://localhost:${this.port}/outputs/${fileName}`;
             }
 
-            this.completedJobs[this.currentJob.id] = {
-                status: 'completed',
-                result: resultData
-            };
-
-            this.broadcast({
-                event: 'job_completed',
-                job_id: this.currentJob.id,
-                result: resultData
-            });
+            if (!this.currentJob.cancelled) {
+                this.completedJobs[this.currentJob.id] = { status: 'completed', result };
+                this.broadcast({ event: 'job_completed', job_id: this.currentJob.id, result });
+            }
 
         } catch (error) {
-            console.error('Job failed:', error.message);
-            this.broadcast({
-                event: 'job_error',
-                job_id: this.currentJob.id,
-                error: error.message
-            });
+            const errorInfo = error.response?.data?.detail || {
+                error_code: 'INFRASTRUCTURE_ERROR',
+                message: error.message
+            };
+            
+            console.error(`[Job ${this.currentJob.id}] Failed:`, errorInfo);
+            
+            this.completedJobs[this.currentJob.id] = { status: 'failed', error: errorInfo };
+            this.broadcast({ event: 'job_failed', job_id: this.currentJob.id, error: errorInfo });
+            
         } finally {
             this.processing = false;
             this.currentJob = null;
-            this.processQueue();
+            setTimeout(() => this.processQueue(), 50); // Small breath
         }
     }
 
-    async proxyToPython(req, res, path, method='GET') {
+    async proxyToPython(req, res, endpoint, method = 'GET') {
         try {
-            const axios = require('axios');
-            const url = `http://localhost:8000${path}`;
-            const response = method === 'GET' ? await axios.get(url) : await axios.post(url, req.body);
+            const config = {
+                headers: { 'X-Bridge-Token': this.getToken() }
+            };
+            const url = `http://127.0.0.1:8000${endpoint}`;
+            const response = method === 'GET' ? await axios.get(url, config) : await axios.post(url, req.body, config);
             res.json(response.data);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            const msg = error.response?.data?.detail || error.message;
+            res.status(error.response?.status || 500).json({ error: msg });
         }
     }
 
     startServices() {
-        // Start Python Backend
-        console.log("Starting Python Backend...");
+        console.log("Launching Prune Juice Backend...");
         const pythonScript = path.join(__dirname, 'python_server.py');
-        // Assuming python is in path. In prod, use bundled python.
         this.pythonProcess = spawn('python', [pythonScript], {
             cwd: path.dirname(__dirname),
             stdio: 'inherit'
         });
 
-        this.pythonProcess.on('error', (err) => {
-            console.error('Failed to start python backend:', err);
-        });
-
-        this.pythonProcess.on('close', (code) => {
-            console.log(`Python backend exited with code ${code}`);
-        });
-
-        // Start API Server
-        this.app.listen(this.port, () => {
-            console.log(`Bridge API listening on port ${this.port}`);
+        this.app.listen(this.port, '127.0.0.1', () => {
+            console.log(`Bridge API active at http://127.0.0.1:${this.port}`);
         });
     }
 }
 
-// Start if run directly
 if (require.main === module) {
-    const server = new BridgeServer();
-    server.startServices();
+    new BridgeServer().startServices();
 }
 
 module.exports = BridgeServer;
