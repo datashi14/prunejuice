@@ -94,8 +94,26 @@ class FooocusConnector:
             generator = torch.Generator(device="cpu").manual_seed(seed)
             
         print(f"Generating: '{prompt}' ({width}x{height})")
+
+        # CRITICAL: CPU WARNING
+        if self.device == "cpu":
+            print("\n" + "!"*50)
+            print("WARNING: COMPUTE DEVICE IS 'CPU'. GENERATION WILL BE EXTREMELY SLOW.")
+            print("Please install CUDA Torch: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121")
+            print("!"*50 + "\n")
+
         start_time = time.time()
         
+        # Scheduler Logic for Lightning/Turbo
+        if steps <= 8:
+            print("Detecting low steps: Switching scheduler to EulerAncestral (Lightning/Turbo mode)")
+            from diffusers import EulerAncestralDiscreteScheduler
+            self.pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(self.pipe.scheduler.config, timestep_spacing="trailing")
+        else:
+            # Default to DPM++ 2M Karras for quality
+            from diffusers import DPMSolverMultistepScheduler
+            self.pipe.scheduler = DPMSolverMultistepScheduler.from_config(self.pipe.scheduler.config, use_karras_sigmas=True)
+
         # Generate
         # Optimization note: Since we used 'enable_model_cpu_offload', we don't need to manually .to("cuda")
         image = self.pipe(

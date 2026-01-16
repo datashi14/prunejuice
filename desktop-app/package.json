@@ -9,6 +9,7 @@
     "vite:dev": "vite",
     "vite:build": "vite build",
     "test": "vitest run",
+    "help:cuda": "echo 'Run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121'",
     "dev": "concurrently \"npm run vite:dev\" \"npm run start\" \"python ../bridge/python_server.py\"",
     "build": "npm run vite:build && electron-builder"
   },

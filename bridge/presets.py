@@ -4,7 +4,7 @@ PRESETS = {
         "name": "Photographic",
         "prompt_suffix": ", 35mm photograph, film, bokeh, professional, 4k, highly detailed",
         "negative_prompt": "drawing, painting, crayon, sketch, graphite, impressionist, noisy, blurry, soft, deformed, ugly",
-        "steps": 30,
+        "steps": 25,
         "guidance": 7.0
     },
     "product": {
@@ -18,7 +18,7 @@ PRESETS = {
         "name": "Professional Portrait",
         "prompt_suffix": ", professional headshot, rim lighting, sharp focus, 85mm lens, f/1.8",
         "negative_prompt": "ugly, deformed, disfigured, cartoon, illustration, low res",
-        "steps": 30,
+        "steps": 25,
         "guidance": 6.5
     },
 
@@ -59,6 +59,13 @@ PRESETS = {
         "negative_prompt": "daylight, sun, nature, organic, rustic",
         "steps": 30,
         "guidance": 7.5
+    },
+    "lightning": {
+        "name": "Lightning (Fast)",
+        "prompt_suffix": ", 4k, high quality",
+        "negative_prompt": "low quality, bad quality",
+        "steps": 6,
+        "guidance": 0.0
     }
 }
 
