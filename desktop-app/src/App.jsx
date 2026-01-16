@@ -31,49 +31,43 @@ const SidebarItem = ({ active, icon: Icon, onClick }) => (
 );
 
 const DesignTab = () => {
-  const [error, setError] = useState(false);
-  
+  // For Alpha release, Penpot integration requires Docker setup
+  // Show a helpful placeholder with info
   return (
     <div className="w-full h-full bg-[#1e1e1e] flex items-center justify-center">
-      {error ? (
-        <div className="text-center space-y-4 p-8">
-          <div className="w-16 h-16 bg-slate-800 rounded-2xl flex items-center justify-center mx-auto">
-            <Icons.Design />
-          </div>
-          <h2 className="text-2xl font-bold text-white">Design Canvas Coming Soon</h2>
-          <p className="text-slate-400 max-w-md">
-            The full Penpot design integration requires running the Penpot server locally.
-            For this Alpha, use the <strong className="text-accent">AI Generator</strong> tab to create amazing images!
-          </p>
-          <div className="pt-4">
-            <a 
-              href="https://penpot.app" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="btn-primary inline-flex items-center gap-2"
-            >
-              Learn about Penpot
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </a>
-          </div>
+      <div className="text-center space-y-6 p-8 max-w-xl">
+        <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-3xl flex items-center justify-center mx-auto shadow-2xl shadow-blue-500/20">
+          <Icons.Design />
         </div>
-      ) : (
-        <iframe 
-          src="http://localhost:9001" 
-          className="w-full h-full border-none" 
-          title="Penpot Design Space"
-          onError={() => setError(true)}
-          onLoad={(e) => {
-            // Check if iframe loaded correctly
-            try {
-              // If we can't access contentWindow, it's a different origin and probably loaded
-              e.target.contentWindow.location.href;
-            } catch {
-              // Cross-origin is fine, Penpot is running
-            }
-          }}
-        />
-      )}
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+          Design Canvas
+        </h2>
+        <p className="text-slate-400 text-lg leading-relaxed">
+          The full Penpot design integration requires running the Penpot server via Docker.
+          For this <span className="text-accent font-semibold">Public Alpha</span>, the AI Image Generator is fully functional!
+        </p>
+        
+        <div className="glass-panel p-6 text-left space-y-4 mt-8">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-accent">To Enable Penpot:</h3>
+          <ol className="text-slate-400 space-y-2 list-decimal list-inside">
+            <li>Install <a href="https://docker.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Docker Desktop</a></li>
+            <li>Run: <code className="bg-slate-800 px-2 py-1 rounded text-xs">docker-compose up -d penpot</code></li>
+            <li>Restart Prune Juice</li>
+          </ol>
+        </div>
+
+        <div className="pt-4 flex gap-4 justify-center">
+          <a 
+            href="https://penpot.app" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="btn-primary inline-flex items-center gap-2"
+          >
+            Learn about Penpot
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </div>
+      </div>
     </div>
   );
 };
